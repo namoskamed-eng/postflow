@@ -17,6 +17,13 @@ Aplicação web responsiva para organizar o fluxo de postagens de vários client
 - Limpeza automática das imagens e do post após o arquivamento
 - Sincronização de clientes nos dois sentidos entre PostFlow e Notion
 - Pasta `A POSTAR — POSTFLOW` para posts ativos e `POSTADOS — POSTFLOW` para o histórico
+- Página individual de cada cliente com seus posts e observações
+- Painel Hoje com atrasados, posts do dia e próximos conteúdos
+- Calendário mensal e quadro Kanban por status
+- Ações rápidas para alterar status, remarcar e duplicar posts
+- Alertas no navegador para posts do dia e atrasados
+- Modelos reutilizáveis de Carrossel, Reels e Post estático
+- Instalação como aplicativo na tela inicial do celular
 
 ## Rodar localmente
 
@@ -84,6 +91,12 @@ O token do Notion fica somente nos secrets do Supabase e nunca é enviado ao nav
 ## Compartilhar artes pelo WhatsApp
 
 Abra um post no celular e toque em **Enviar artes**. O PostFlow reúne somente as imagens e abre o menu de compartilhamento do aparelho; escolha WhatsApp e depois a conversa. Toque em **Salvar** para abrir o mesmo menu e escolher **Salvar nas Fotos/Galeria**, quando essa opção for oferecida pelo sistema. Em navegadores sem compartilhamento de arquivos, as imagens são baixadas normalmente.
+
+## Instalar no celular e receber alertas
+
+- No painel **Hoje**, toque em **Instalar**. No iPhone, use **Compartilhar → Adicionar à Tela de Início**; no Android, confirme **Instalar app** no navegador.
+- Toque em **Ativar alertas** para receber um resumo dos posts atrasados e previstos para o dia quando o PostFlow estiver em uso.
+- Os modelos podem ser administrados na área **Modelos** e escolhidos ao criar uma nova postagem.
 
 ## Comandos
 

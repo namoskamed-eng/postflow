@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Client, ClientInput, Post, PostImage, PostInput } from "@/types";
+import type { Client, ClientInput, Post, PostImage, PostInput, PostTemplate, PostTemplateInput } from "@/types";
 
 const CLIENTS_KEY = "postflow_clients";
 const POSTS_KEY = "postflow_posts";
@@ -116,5 +116,34 @@ export async function deletePostImage(postId: string, imageId: string) {
     return;
   }
   const { error } = await supabase.from("post_images").delete().eq("id", imageId);
+  if (error) throw error;
+}
+
+export async function getTemplates(): Promise<PostTemplate[]> {
+  if (!supabase) return readLocal<PostTemplate[]>("postflow_templates", []);
+  const { data, error } = await supabase.from("post_templates").select("*").order("name");
+  if (error) throw error;
+  return data as PostTemplate[];
+}
+
+export async function saveTemplate(input: PostTemplateInput, templateId?: string): Promise<PostTemplate> {
+  if (!supabase) {
+    const templates = readLocal<PostTemplate[]>("postflow_templates", []);
+    const template = { ...input, id: templateId || id(), created_at: templates.find((item) => item.id === templateId)?.created_at || new Date().toISOString() };
+    writeLocal("postflow_templates", templateId ? templates.map((item) => item.id === templateId ? template : item) : [...templates, template]);
+    return template;
+  }
+  const query = templateId ? supabase.from("post_templates").update(input).eq("id", templateId) : supabase.from("post_templates").insert(input);
+  const { data, error } = await query.select().single();
+  if (error) throw error;
+  return data as PostTemplate;
+}
+
+export async function deleteTemplate(templateId: string) {
+  if (!supabase) {
+    writeLocal("postflow_templates", readLocal<PostTemplate[]>("postflow_templates", []).filter((item) => item.id !== templateId));
+    return;
+  }
+  const { error } = await supabase.from("post_templates").delete().eq("id", templateId);
   if (error) throw error;
 }

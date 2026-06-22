@@ -42,5 +42,17 @@ export interface Post {
   images: PostImage[];
 }
 
+export interface PostTemplate {
+  id: string;
+  name: string;
+  platform: Platform;
+  type: PostType;
+  caption: string;
+  content: string;
+  notes: string;
+  created_at: string;
+}
+
 export type ClientInput = Omit<Client, "id" | "created_at">;
 export type PostInput = Omit<Post, "id" | "created_at" | "images">;
+export type PostTemplateInput = Omit<PostTemplate, "id" | "created_at">;

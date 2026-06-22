@@ -12,9 +12,10 @@ type Props = {
   onNew: () => void;
   onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
+  onOpen: (client: Client) => void;
 };
 
-export function ClientsView({ clients, posts, syncing, onSync, onNew, onEdit, onDelete }: Props) {
+export function ClientsView({ clients, posts, syncing, onSync, onNew, onEdit, onDelete, onOpen }: Props) {
   return (
     <div>
       <div className="mb-8 flex items-end justify-between gap-4">
@@ -44,9 +45,11 @@ export function ClientsView({ clients, posts, syncing, onSync, onNew, onEdit, on
                   <button aria-label="Excluir cliente" onClick={() => onDelete(client)} className="rounded-lg p-2 text-[#77776F] hover:bg-[#FFF0ED] hover:text-red-600"><Trash2 size={17} /></button>
                 </div>
               </div>
-              <h2 className="font-display mt-5 text-lg font-extrabold">{client.name}</h2>
-              <p className="text-sm text-[#85857E]">{client.handle || "Sem perfil informado"}</p>
-              <div className="mt-5 border-t border-[#EEEEEA] pt-4 text-xs font-semibold text-[#66665F]">{posts.filter((post) => post.client_id === client.id).length} postagens</div>
+              <button onClick={() => onOpen(client)} className="block w-full text-left">
+                <h2 className="font-display mt-5 text-lg font-extrabold">{client.name}</h2>
+                <p className="text-sm text-[#85857E]">{client.handle || "Sem perfil informado"}</p>
+                <div className="mt-5 border-t border-[#EEEEEA] pt-4 text-xs font-semibold text-[#66665F]">{posts.filter((post) => post.client_id === client.id).length} postagens · Ver cliente</div>
+              </button>
             </article>
           ))}
         </div>

@@ -1,11 +1,11 @@
 "use client";
 
-import { CalendarDays, ChevronRight, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, ChevronRight, CopyPlus, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Client, Post } from "@/types";
+import type { Client, Post, PostInput, PostStatus } from "@/types";
 import { PLATFORMS, POST_TYPES, STATUSES } from "@/types";
 import { Button, EmptyState, inputClass } from "./ui";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const statusStyle: Record<string, string> = {
   Ideia: "bg-[#EAEAE5] text-[#64645E]",
@@ -21,9 +21,11 @@ type Props = {
   clients: Client[];
   onNew: () => void;
   onOpen: (post: Post) => void;
+  onQuickUpdate: (post: Post, changes: Partial<PostInput>) => Promise<void>;
+  onDuplicate: (post: Post) => Promise<void>;
 };
 
-export function PostsView({ posts, clients, onNew, onOpen }: Props) {
+export function PostsView({ posts, clients, onNew, onOpen, onQuickUpdate, onDuplicate }: Props) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [client, setClient] = useState("");
@@ -121,27 +123,26 @@ export function PostsView({ posts, clients, onNew, onOpen }: Props) {
                 <span className="rounded-full bg-[#E8E8E2] px-2.5 py-1 text-xs font-bold text-[#66665F]">{group.posts.length}</span>
               </div>
               <div className="overflow-hidden rounded-3xl border border-[#E0E0DA] bg-white">
-                <div className="hidden grid-cols-[minmax(240px,1fr)_130px_150px_32px] border-b border-[#E8E8E2] bg-[#F2F2EE] px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[#77776F] md:grid">
+                <div className="hidden grid-cols-[minmax(220px,1fr)_145px_155px_44px] border-b border-[#E8E8E2] bg-[#F2F2EE] px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[#77776F] md:grid">
                   <span>Conteúdo</span><span>Status</span><span>Data</span><span />
                 </div>
                 {group.posts.map((post, index) => (
-                  <button
-                    onClick={() => onOpen(post)}
+                  <div
                     key={post.id}
                     className={cn(
-                      "animate-rise grid w-full items-center gap-3 border-b border-[#ECECE7] p-4 text-left transition last:border-0 hover:bg-[#FAFAF7] md:grid-cols-[minmax(240px,1fr)_130px_150px_32px] md:px-5",
+                      "animate-rise grid w-full items-center gap-3 border-b border-[#ECECE7] p-4 text-left transition last:border-0 hover:bg-[#FAFAF7] md:grid-cols-[minmax(220px,1fr)_145px_155px_44px] md:px-5",
                       index % 2 === 1 && "bg-[#FDFDFC]",
                     )}
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
-                    <div className="min-w-0">
+                    <button onClick={() => onOpen(post)} className="min-w-0 text-left">
                       <h3 className="truncate font-display text-[15px] font-extrabold">{post.title}</h3>
-                      <p className="mt-1 text-xs text-[#81817A]">{post.platform} · {post.type}</p>
-                    </div>
-                    <div><span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-bold", statusStyle[post.status])}>{post.status}</span></div>
-                    <div className="text-sm text-[#62625C]">{formatDate(post.planned_date)}</div>
-                    <ChevronRight className="hidden text-[#9B9B94] md:block" size={18} />
-                  </button>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-[#81817A]">{post.platform} · {post.type}<ChevronRight size={14} /></p>
+                    </button>
+                    <select aria-label={`Status de ${post.title}`} value={post.status} onChange={(event) => void onQuickUpdate(post, { status: event.target.value as PostStatus })} className={cn("h-10 rounded-xl border-0 px-2 text-xs font-bold outline-none", statusStyle[post.status])}>{STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
+                    <input aria-label={`Data de ${post.title}`} type="date" value={post.planned_date || ""} onChange={(event) => void onQuickUpdate(post, { planned_date: event.target.value })} className="h-10 rounded-xl border border-[#DEDED8] bg-white px-2 text-xs" />
+                    <button aria-label={`Duplicar ${post.title}`} title="Duplicar post" onClick={() => void onDuplicate(post)} className="grid size-10 place-items-center rounded-xl border border-[#DEDED8] bg-white hover:border-black"><CopyPlus size={17} /></button>
+                  </div>
                 ))}
               </div>
             </section>
