@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { corsHeaders, createChildPage, ensureClientStructure, findClientStructure, json, listChildPages, notionRequest, requireUser, trashPage } from "../_shared/common.ts";
+import { corsHeaders, createChildPage, ensureClientStructure, findClientStructure, json, listChildPages, normalizeTitle, notionRequest, requireUser, trashPage } from "../_shared/common.ts";
 
 const BUCKET = "post-images";
 
@@ -68,14 +68,31 @@ Deno.serve(async (request) => {
     if (body.action === "create") {
       const input = body.input;
       if (!input?.name?.trim()) return json({ error: "Informe o nome do cliente." }, 400);
-      const notionClient = await createChildPage(rootId, input.name.trim(), "👤");
+      const name = input.name.trim();
+      const [notionClients, databaseResult] = await Promise.all([
+        listChildPages(rootId),
+        admin.from("clients").select("*").order("created_at"),
+      ]);
+      if (databaseResult.error) throw databaseResult.error;
+      const matches = notionClients
+        .filter((client) => normalizeTitle(client.title) === normalizeTitle(name))
+        .sort((a, b) => String(a.created_time || "").localeCompare(String(b.created_time || "")));
+      const databaseMatches = (databaseResult.data || []).filter((client) => normalizeTitle(client.name) === normalizeTitle(name));
+      let notionClient = matches.find((page) => databaseMatches.some((client) => client.notion_client_page_id === page.id)) || matches[0];
+      const reusedNotionPage = Boolean(notionClient);
+      if (!notionClient) notionClient = await createChildPage(rootId, name, "👤");
       try {
         const structure = await ensureClientStructure(notionClient.id);
-        const { data, error } = await admin.from("clients").insert({ ...input, name: input.name.trim(), notion_client_page_id: notionClient.id, ...structure, hidden_in_app: false }).select().single();
+        const existing = databaseMatches.find((client) => client.notion_client_page_id === notionClient.id) || databaseMatches[0];
+        const values = { ...input, name, notion_client_page_id: notionClient.id, ...structure, hidden_in_app: false };
+        const query = existing
+          ? admin.from("clients").update(values).eq("id", existing.id)
+          : admin.from("clients").insert(values);
+        const { data, error } = await query.select().single();
         if (error) throw error;
-        return json(data);
+        return json({ ...data, reusedNotionPage });
       } catch (error) {
-        await trashPage(notionClient.id).catch(() => undefined);
+        if (!reusedNotionPage) await trashPage(notionClient.id).catch(() => undefined);
         throw error;
       }
     }

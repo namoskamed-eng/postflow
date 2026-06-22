@@ -49,14 +49,14 @@ export async function notionRequest(endpoint: string, init: RequestInit = {}) {
 }
 
 export async function listChildPages(parentId: string) {
-  const pages: Array<{ id: string; title: string }> = [];
+  const pages: Array<{ id: string; title: string; created_time?: string }> = [];
   let cursor = "";
   do {
     const query = new URLSearchParams({ page_size: "100" });
     if (cursor) query.set("start_cursor", cursor);
     const data = await notionRequest(`/blocks/${parentId}/children?${query}`);
     for (const block of data.results || []) {
-      if (block.type === "child_page" && !block.in_trash) pages.push({ id: block.id, title: block.child_page?.title || "Sem nome" });
+      if (block.type === "child_page" && !block.in_trash) pages.push({ id: block.id, title: block.child_page?.title || "Sem nome", created_time: block.created_time });
     }
     cursor = data.has_more ? data.next_cursor : "";
   } while (cursor);
@@ -78,7 +78,7 @@ export const ACTIVE_FOLDER_TITLE = "A POSTAR — POSTFLOW";
 export const ARCHIVE_FOLDER_TITLE = "POSTADOS — POSTFLOW";
 
 export function normalizeTitle(title: string) {
-  return title.trim().toLocaleUpperCase("pt-BR").replace(/[—–-]/g, " ").replace(/\s+/g, " ");
+  return title.trim().toLocaleUpperCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[—–-]/g, " ").replace(/\s+/g, " ");
 }
 
 export async function findClientStructure(clientPageId: string) {

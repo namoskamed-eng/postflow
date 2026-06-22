@@ -65,11 +65,12 @@ O token do Notion fica somente nos secrets do Supabase e nunca é enviado ao nav
 ## Sincronização de clientes
 
 - Um cliente do Notion só aparece no PostFlow quando possui `Cliente → POSTS → A POSTAR — POSTFLOW`.
-- Ao cadastrar um cliente no PostFlow, o app cria `Cliente → POSTS → A POSTAR — POSTFLOW` e `POSTADOS — POSTFLOW`.
+- Ao cadastrar um cliente, o PostFlow procura primeiro uma página com o mesmo nome no Notion. Se encontrar, reutiliza a página original e apenas completa `A POSTAR — POSTFLOW` e `POSTADOS — POSTFLOW`; somente cria uma página de cliente quando o nome ainda não existe.
 - Se um cliente do Notion tiver `A POSTAR — POSTFLOW`, mas não tiver `POSTADOS — POSTFLOW`, o app cria a pasta de histórico automaticamente.
 - Renomear um cliente pelo PostFlow também atualiza o título da página no Notion.
 - Remover um cliente pelo PostFlow move as duas pastas PostFlow para a lixeira do Notion, remove seus posts e imagens do app e preserva o restante da página do cliente.
 - Os IDs das páginas, e não apenas os nomes, são usados para impedir duplicatas.
+- A sincronização automática ocorre em segundo plano às 00h e 12h. Se o app estiver fechado, ela acontece na primeira abertura após o horário, sem bloquear o carregamento da tela. O botão **Atualizar do Notion** continua disponível para sincronização manual.
 
 ### Como funciona
 
