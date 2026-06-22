@@ -9,6 +9,7 @@ create table if not exists public.clients (
   notes text not null default '',
   notion_client_page_id text not null default '',
   notion_posts_page_id text not null default '',
+  notion_active_page_id text not null default '',
   notion_archive_page_id text not null default '',
   hidden_in_app boolean not null default false,
   created_at timestamptz not null default now()
@@ -16,6 +17,7 @@ create table if not exists public.clients (
 
 alter table public.clients add column if not exists notion_client_page_id text not null default '';
 alter table public.clients add column if not exists notion_posts_page_id text not null default '';
+alter table public.clients add column if not exists notion_active_page_id text not null default '';
 alter table public.clients add column if not exists notion_archive_page_id text not null default '';
 alter table public.clients add column if not exists hidden_in_app boolean not null default false;
 create unique index if not exists clients_notion_page_unique on public.clients (notion_client_page_id) where notion_client_page_id <> '';
@@ -24,6 +26,7 @@ create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
   slug text,
   notion_page_id text,
+  notion_archived boolean not null default false,
   client_id uuid not null references public.clients(id) on delete cascade,
   title text not null,
   planned_date date,
@@ -39,6 +42,7 @@ create table if not exists public.posts (
 -- Migração segura para projetos criados antes do sincronizador.
 alter table public.posts add column if not exists slug text;
 alter table public.posts add column if not exists notion_page_id text;
+alter table public.posts add column if not exists notion_archived boolean not null default false;
 create unique index if not exists posts_slug_unique on public.posts (slug) where slug is not null;
 
 create table if not exists public.post_images (

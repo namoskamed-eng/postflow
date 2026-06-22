@@ -16,10 +16,10 @@ const basePath=process.env.NEXT_PUBLIC_BASE_PATH||"";
 
 export default function Home(){
  const [view,setView]=useState<View>("posts");const [clients,setClients]=useState<Client[]>([]);const [posts,setPosts]=useState<Post[]>([]);const [loading,setLoading]=useState(true);const [syncing,setSyncing]=useState(false);const [error,setError]=useState("");const [clientModal,setClientModal]=useState(false);const [postModal,setPostModal]=useState(false);const [editingClient,setEditingClient]=useState<Client|null>(null);const [editingPost,setEditingPost]=useState<Post|null>(null);const [detail,setDetail]=useState<Post|null>(null);
- async function load(){try{setError("");const [c,p]=await Promise.all([getClients(),getPosts()]);setClients(c);setPosts(p)}catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar os dados.")}finally{setLoading(false)}}
+ async function load(){try{setError("");const [c,p]=await Promise.all([getClients(),getPosts()]);const visibleClientIds=new Set(c.map(client=>client.id));setClients(c);setPosts(p.filter(post=>visibleClientIds.has(post.client_id)))}catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar os dados.")}finally{setLoading(false)}}
  useEffect(()=>{void (async()=>{if(hasSupabase){const {data}=await supabase!.auth.getSession();if(!data.session){window.location.replace(`${basePath}/login`);return}try{await supabase!.functions.invoke("clients",{body:{action:"sync"}})}catch{}}await load()})()},[]);
  const openClient=(c?:Client)=>{setEditingClient(c||null);setClientModal(true)};const openPost=(p?:Post)=>{setEditingPost(p||null);setPostModal(true)};
- async function handleSyncClients(){setSyncing(true);try{const {data,error:syncError}=await supabase!.functions.invoke("clients",{body:{action:"sync"}});if(syncError)throw syncError;await load();alert(`Clientes atualizados. ${data?.created||0} novo(s) encontrado(s).`)}catch(e){alert(e instanceof Error?e.message:"Não foi possível atualizar os clientes.")}finally{setSyncing(false)}}
+ async function handleSyncClients(){setSyncing(true);try{const {data,error:syncError}=await supabase!.functions.invoke("clients",{body:{action:"sync"}});if(syncError)throw syncError;if(data?.error)throw new Error(data.error);await load();alert(`Clientes atualizados. ${data?.created||0} novo(s) e ${data?.hidden||0} ocultado(s) pela ausência de A POSTAR — POSTFLOW.`)}catch(e){alert(e instanceof Error?e.message:"Não foi possível atualizar os clientes.")}finally{setSyncing(false)}}
  async function handleClient(input:ClientInput){
   if(!hasSupabase){await saveClient(input,editingClient?.id);setClientModal(false);await load();return}
   try{
@@ -44,7 +44,7 @@ export default function Home(){
    setPostModal(false);setDetail(null);await load();
   }catch(e){alert(e instanceof Error?e.message:"Não foi possível salvar o post.");await load()}
  }
- async function handleDeleteClient(c:Client){if(confirm(`Remover ${c.name} do PostFlow e excluir as postagens ativas? O histórico no Notion será preservado.`)){await deleteClient(c.id);await load()}}
+ async function handleDeleteClient(c:Client){if(confirm(`Excluir ${c.name} do PostFlow? As pastas A POSTAR — POSTFLOW e POSTADOS — POSTFLOW, incluindo o histórico, serão movidas para a lixeira do Notion.`)){await deleteClient(c.id);await load()}}
  async function handleDeletePost(p:Post){if(confirm(`Excluir a postagem “${p.title}”?`)){await deletePost(p.id);setDetail(null);await load()}}
  async function handleDeleteImage(p:Post,imageId:string){if(confirm("Remover esta imagem?")){await deletePostImage(p.id,imageId);await load();setDetail(d=>d?{...d,images:d.images.filter(i=>i.id!==imageId)}:null)}}
  async function handleLogout(){await supabase?.auth.signOut();window.location.replace(`${basePath}/login`)}

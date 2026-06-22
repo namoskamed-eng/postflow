@@ -58,6 +58,10 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
     setDownloading(true);
     try {
       const files = await getImageFiles();
+      if (navigator.canShare?.({ files })) {
+        await navigator.share({ files });
+        return;
+      }
       for (const file of files) {
         const url = URL.createObjectURL(file);
         const link = document.createElement("a");
@@ -68,6 +72,7 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       alert(error instanceof Error ? error.message : "Não foi possível baixar as artes.");
     } finally {
       setDownloading(false);
@@ -118,7 +123,7 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
               <div className="flex gap-2">
                 <Button variant="secondary" className="h-10 px-3" onClick={downloadAll} disabled={downloading || sharing}>
                   {downloading ? <LoaderCircle className="animate-spin" size={16} /> : <Download size={16} />}
-                  <span className="hidden sm:inline">Baixar todas</span>
+                  <span className="sm:hidden">Salvar</span><span className="hidden sm:inline">Salvar imagens</span>
                 </Button>
                 <Button className="h-10 px-3" onClick={shareImages} disabled={sharing || downloading}>
                   {sharing ? <LoaderCircle className="animate-spin" size={16} /> : <Share2 size={16} />}
@@ -126,7 +131,7 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
                 </Button>
               </div>
             </div>
-            <p className="mb-3 text-xs text-[#77776F]">No celular, escolha o WhatsApp na próxima tela.</p>
+            <p className="mb-3 text-xs text-[#77776F]">No celular, escolha Salvar nas Fotos/Galeria ou WhatsApp na próxima tela.</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {post.images.map((image) => (
                 <div className="group relative aspect-square overflow-hidden rounded-2xl bg-[#E8E8E2]" key={image.id}>

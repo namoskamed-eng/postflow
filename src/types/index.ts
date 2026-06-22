@@ -14,6 +14,7 @@ export interface Client {
   notes: string;
   notion_client_page_id: string;
   notion_posts_page_id: string;
+  notion_active_page_id: string;
   notion_archive_page_id: string;
   hidden_in_app: boolean;
   created_at: string;

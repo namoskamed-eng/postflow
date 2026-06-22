@@ -37,3 +37,15 @@ insert into public.clients (name, handle, color, notes, notion_client_page_id, n
 select mapping.name, '', '#31312F', '', mapping.notion_client_page_id, mapping.notion_posts_page_id, mapping.notion_archive_page_id
 from postflow_notion_mapping mapping
 where not exists (select 1 from public.clients client where client.notion_client_page_id = mapping.notion_client_page_id or lower(client.name) = lower(mapping.name));
+
+-- Pela regra atual, somente clientes com A POSTAR — POSTFLOW ficam visíveis.
+update public.clients as client
+set notion_active_page_id = case
+      when client.notion_client_page_id = '19958080-7dd6-8091-bd69-fa63b6df8f8a' then '38758080-7dd6-8096-8240-cc6fc15d28d8'
+      else ''
+    end,
+    hidden_in_app = client.notion_client_page_id <> '19958080-7dd6-8091-bd69-fa63b6df8f8a'
+where exists (
+  select 1 from postflow_notion_mapping mapping
+  where mapping.notion_client_page_id = client.notion_client_page_id
+);

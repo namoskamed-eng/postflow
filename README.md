@@ -16,6 +16,7 @@ Aplicação web responsiva para organizar o fluxo de postagens de vários client
 - Arquivamento automático no Notion ao marcar um post como Publicado
 - Limpeza automática das imagens e do post após o arquivamento
 - Sincronização de clientes nos dois sentidos entre PostFlow e Notion
+- Pasta `A POSTAR — POSTFLOW` para posts ativos e `POSTADOS — POSTFLOW` para o histórico
 
 ## Rodar localmente
 
@@ -63,24 +64,25 @@ O token do Notion fica somente nos secrets do Supabase e nunca é enviado ao nav
 
 ## Sincronização de clientes
 
-- Ao cadastrar um cliente no PostFlow, o app cria no Notion a estrutura `Cliente → POSTS → POSTADOS — POSTFLOW` e salva os IDs automaticamente.
-- Ao criar uma página de cliente diretamente dentro da página principal `CLIENTES` do Notion, ela aparece no PostFlow na próxima abertura ou atualização do app.
-- Se o cliente criado no Notion não tiver `POSTS` ou `POSTADOS — POSTFLOW`, o PostFlow completa a estrutura.
+- Um cliente do Notion só aparece no PostFlow quando possui `Cliente → POSTS → A POSTAR — POSTFLOW`.
+- Ao cadastrar um cliente no PostFlow, o app cria `Cliente → POSTS → A POSTAR — POSTFLOW` e `POSTADOS — POSTFLOW`.
+- Se um cliente do Notion tiver `A POSTAR — POSTFLOW`, mas não tiver `POSTADOS — POSTFLOW`, o app cria a pasta de histórico automaticamente.
 - Renomear um cliente pelo PostFlow também atualiza o título da página no Notion.
-- Remover um cliente pelo PostFlow apenas o oculta no app e remove seus posts ativos. A página e o histórico do Notion são preservados e o cliente não reaparece na sincronização.
+- Remover um cliente pelo PostFlow move as duas pastas PostFlow para a lixeira do Notion, remove seus posts e imagens do app e preserva o restante da página do cliente.
 - Os IDs das páginas, e não apenas os nomes, são usados para impedir duplicatas.
 
 ### Como funciona
 
-- Ao selecionar o status **Publicado**, o app pede confirmação.
-- O conteúdo estruturado é criado como uma nova página dentro de `POSTADOS — POSTFLOW` do cliente.
+- Ao criar um post no app, uma página de texto estruturado é criada dentro de `A POSTAR — POSTFLOW`.
+- Editar o post atualiza a mesma página no Notion.
+- Ao selecionar o status **Publicado**, o app pede confirmação e move a própria página para `POSTADOS — POSTFLOW`.
 - Somente após a confirmação do Notion, as imagens são removidas do Storage e o post é apagado do PostFlow.
 - Se qualquer etapa falhar, o post permanece no app para uma nova tentativa.
 - O ID da página criada é salvo antes da limpeza, evitando duplicação caso apenas a exclusão das imagens falhe.
 
 ## Compartilhar artes pelo WhatsApp
 
-Abra um post no celular e toque em **Enviar artes**. O PostFlow reúne todas as imagens e abre o menu de compartilhamento do aparelho; escolha WhatsApp e depois a conversa. Essa função exige que o app esteja publicado em HTTPS. **Baixar todas** serve como alternativa em navegadores sem compartilhamento de arquivos.
+Abra um post no celular e toque em **Enviar artes**. O PostFlow reúne somente as imagens e abre o menu de compartilhamento do aparelho; escolha WhatsApp e depois a conversa. Toque em **Salvar** para abrir o mesmo menu e escolher **Salvar nas Fotos/Galeria**, quando essa opção for oferecida pelo sistema. Em navegadores sem compartilhamento de arquivos, as imagens são baixadas normalmente.
 
 ## Comandos
 
@@ -111,5 +113,6 @@ Os dados continuam no Supabase, e as operações com o Notion passam pelas Edge 
 - `supabase/schema.sql`: banco, storage e políticas
 - `supabase/notion_clients_seed.sql`: clientes e destinos do Notion
 - `supabase/functions/clients`: sincronização segura dos clientes com o Notion
+- `supabase/functions/posts`: criação e atualização dos posts em `A POSTAR — POSTFLOW`
 - `supabase/functions/archive-post`: arquivamento seguro e limpeza das imagens
 - `.github/workflows/pages.yml`: publicação automática no GitHub Pages

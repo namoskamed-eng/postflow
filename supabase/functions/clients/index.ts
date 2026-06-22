@@ -1,5 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { corsHeaders, createChildPage, ensureClientStructure, json, listChildPages, notionRequest, requireUser } from "../_shared/common.ts";
+import { corsHeaders, createChildPage, ensureClientStructure, findClientStructure, json, listChildPages, notionRequest, requireUser, trashPage } from "../_shared/common.ts";
+
+const BUCKET = "post-images";
+
+function storagePath(url: string) {
+  const marker = `/storage/v1/object/public/${BUCKET}/`;
+  const index = url.indexOf(marker);
+  return index < 0 ? null : decodeURIComponent(url.slice(index + marker.length));
+}
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -15,35 +23,61 @@ Deno.serve(async (request) => {
       const databaseClients = databaseResult.data || [];
       const byNotionId = new Map(databaseClients.filter((client) => client.notion_client_page_id).map((client) => [client.notion_client_page_id, client]));
       const byName = new Map(databaseClients.map((client) => [client.name.toLocaleLowerCase("pt-BR"), client]));
+      const visibleNotionIds = new Set<string>();
       let created = 0;
       let updated = 0;
+
       for (const notionClient of notionClients) {
+        const found = await findClientStructure(notionClient.id);
+        if (!found.posts || !found.active) continue;
+        let archive = found.archive;
+        if (!archive) {
+          const page = await createChildPage(found.posts.id, "POSTADOS — POSTFLOW", "✅");
+          archive = { id: page.id, title: "POSTADOS — POSTFLOW" };
+        }
+        visibleNotionIds.add(notionClient.id);
         const existing = byNotionId.get(notionClient.id) || byName.get(notionClient.title.toLocaleLowerCase("pt-BR"));
-        if (existing?.hidden_in_app) continue;
-        const structure = existing?.notion_posts_page_id && existing?.notion_archive_page_id
-          ? { notion_posts_page_id: existing.notion_posts_page_id, notion_archive_page_id: existing.notion_archive_page_id }
-          : await ensureClientStructure(notionClient.id);
+        const structure = {
+          notion_client_page_id: notionClient.id,
+          notion_posts_page_id: found.posts.id,
+          notion_active_page_id: found.active.id,
+          notion_archive_page_id: archive.id,
+          hidden_in_app: false,
+        };
         if (existing) {
-          const { error } = await admin.from("clients").update({ name: notionClient.title, notion_client_page_id: notionClient.id, ...structure }).eq("id", existing.id);
+          const { error } = await admin.from("clients").update({ name: notionClient.title, ...structure }).eq("id", existing.id);
           if (error) throw error;
           updated++;
         } else {
-          const { error } = await admin.from("clients").insert({ name: notionClient.title, handle: "", color: "#31312F", notes: "Criado a partir do Notion", notion_client_page_id: notionClient.id, ...structure });
+          const { error } = await admin.from("clients").insert({ name: notionClient.title, handle: "", color: "#31312F", notes: "Criado a partir do Notion", ...structure });
           if (error) throw error;
           created++;
         }
       }
-      return json({ created, updated });
+
+      const toHide = databaseClients
+        .filter((client) => client.notion_client_page_id && !visibleNotionIds.has(client.notion_client_page_id))
+        .map((client) => client.id);
+      if (toHide.length) {
+        const { error } = await admin.from("clients").update({ hidden_in_app: true }).in("id", toHide);
+        if (error) throw error;
+      }
+      return json({ created, updated, hidden: toHide.length });
     }
 
     if (body.action === "create") {
       const input = body.input;
       if (!input?.name?.trim()) return json({ error: "Informe o nome do cliente." }, 400);
       const notionClient = await createChildPage(rootId, input.name.trim(), "👤");
-      const structure = await ensureClientStructure(notionClient.id);
-      const { data, error } = await admin.from("clients").insert({ ...input, name: input.name.trim(), notion_client_page_id: notionClient.id, ...structure, hidden_in_app: false }).select().single();
-      if (error) throw error;
-      return json(data);
+      try {
+        const structure = await ensureClientStructure(notionClient.id);
+        const { data, error } = await admin.from("clients").insert({ ...input, name: input.name.trim(), notion_client_page_id: notionClient.id, ...structure, hidden_in_app: false }).select().single();
+        if (error) throw error;
+        return json(data);
+      } catch (error) {
+        await trashPage(notionClient.id).catch(() => undefined);
+        throw error;
+      }
     }
 
     if (body.action === "update") {
@@ -53,9 +87,34 @@ Deno.serve(async (request) => {
       if (client.notion_client_page_id) {
         await notionRequest(`/pages/${client.notion_client_page_id}`, { method: "PATCH", body: JSON.stringify({ properties: { title: { title: [{ type: "text", text: { content: input.name.trim() } }] } } }) });
       }
-      const { data, error } = await admin.from("clients").update({ ...input, notion_client_page_id: client.notion_client_page_id, notion_posts_page_id: client.notion_posts_page_id, notion_archive_page_id: client.notion_archive_page_id, hidden_in_app: false }).eq("id", clientId).select().single();
+      const { data, error } = await admin.from("clients").update({
+        ...input,
+        notion_client_page_id: client.notion_client_page_id,
+        notion_posts_page_id: client.notion_posts_page_id,
+        notion_active_page_id: client.notion_active_page_id,
+        notion_archive_page_id: client.notion_archive_page_id,
+        hidden_in_app: false,
+      }).eq("id", clientId).select().single();
       if (error) throw error;
       return json(data);
+    }
+
+    if (body.action === "delete") {
+      const { clientId } = body;
+      const { data: client, error: clientError } = await admin.from("clients").select("*").eq("id", clientId).single();
+      if (clientError || !client) throw clientError || new Error("Cliente não encontrado.");
+      const { data: images, error: imageError } = await admin.from("post_images").select("url, post:posts!inner(client_id)").eq("post.client_id", clientId);
+      if (imageError) throw imageError;
+      const paths = (images || []).map((image) => storagePath(image.url)).filter(Boolean) as string[];
+      if (paths.length) {
+        const { error } = await admin.storage.from(BUCKET).remove(paths);
+        if (error) throw error;
+      }
+      await trashPage(client.notion_active_page_id);
+      await trashPage(client.notion_archive_page_id);
+      const { error } = await admin.from("clients").delete().eq("id", clientId);
+      if (error) throw error;
+      return json({ deleted: true });
     }
 
     return json({ error: "Ação inválida." }, 400);
