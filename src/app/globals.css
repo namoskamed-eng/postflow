@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+:root { --ink:#1D1D1B; --muted:#72726C; --paper:#F7F7F4; --lime:#D9FF57; --line:#E5E5DF; --font-body:"Avenir Next",Avenir,"Segoe UI",sans-serif; --font-display:"Arial Rounded MT Bold","Avenir Next",Avenir,sans-serif; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body),sans-serif; }
+button,input,textarea,select { font:inherit; }
+button { cursor:pointer; }
+.font-display { font-family:var(--font-display),sans-serif; }
+.scrollbar-none::-webkit-scrollbar { display:none; }
+.scrollbar-none { scrollbar-width:none; }
+@keyframes rise { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
+.animate-rise { animation:rise .35s ease-out both; }
