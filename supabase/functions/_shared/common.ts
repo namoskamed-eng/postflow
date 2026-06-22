@@ -151,14 +151,15 @@ export async function replacePostContent(pageId: string, post: Record<string, st
 }
 
 export async function createPostPage(parentId: string, post: Record<string, string>, clientName: string) {
-  const page = await createChildPage(parentId, post.title, "📝");
-  try {
-    await replacePostContent(page.id, post, clientName);
-  } catch (error) {
-    await notionRequest(`/pages/${page.id}`, { method: "PATCH", body: JSON.stringify({ in_trash: true }) }).catch(() => undefined);
-    throw error;
-  }
-  return page;
+  return notionRequest("/pages", {
+    method: "POST",
+    body: JSON.stringify({
+      parent: { type: "page_id", page_id: parentId },
+      icon: { type: "emoji", emoji: "📝" },
+      properties: { title: { title: richText(post.title) } },
+      markdown: postMarkdown(post, clientName),
+    }),
+  });
 }
 
 export async function trashPage(pageId?: string | null) {

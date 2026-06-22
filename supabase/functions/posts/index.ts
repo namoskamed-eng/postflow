@@ -91,6 +91,7 @@ Deno.serve(async (request) => {
     if (body.action === "save") {
       const { input, postId } = body;
       if (!input?.title?.trim() || !input?.client_id) return json({ error: "Preencha o título e o cliente." }, 400);
+      const databaseInput = { ...input, planned_date: input.planned_date || null };
       const { data: client, error: clientError } = await admin.from("clients").select("name,notion_active_page_id").eq("id", input.client_id).single();
       if (clientError || !client) throw clientError || new Error("Cliente não encontrado.");
       if (!client.notion_active_page_id) throw new Error(`O cliente ${client.name} não possui a pasta A POSTAR — POSTFLOW.`);
@@ -111,13 +112,13 @@ Deno.serve(async (request) => {
             });
           }
         }
-        const { data, error } = await admin.from("posts").update({ ...input, notion_page_id: notionPageId, notion_archived: false, published_at: null }).eq("id", postId).select().single();
+        const { data, error } = await admin.from("posts").update({ ...databaseInput, notion_page_id: notionPageId, notion_archived: false, published_at: null }).eq("id", postId).select().single();
         if (error) throw error;
         return json(data);
       }
 
       const page = await createPostPage(client.notion_active_page_id, input, client.name);
-      const { data, error } = await admin.from("posts").insert({ ...input, notion_page_id: page.id, notion_archived: false, published_at: null }).select().single();
+      const { data, error } = await admin.from("posts").insert({ ...databaseInput, notion_page_id: page.id, notion_archived: false, published_at: null }).select().single();
       if (error) {
         await trashPage(page.id).catch(() => undefined);
         throw error;

@@ -22,6 +22,17 @@ function readLocal<T>(key: string, seed: T): T {
 function writeLocal<T>(key: string, value: T) { localStorage.setItem(key, JSON.stringify(value)); }
 function id() { return crypto.randomUUID(); }
 
+async function functionErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "context" in error) {
+    const context = (error as { context?: Response }).context;
+    if (context) {
+      const payload = await context.clone().json().catch(() => null) as { error?: string; message?: string } | null;
+      if (payload?.error || payload?.message) return payload.error || payload.message || fallback;
+    }
+  }
+  return error instanceof Error && !error.message.includes("non-2xx") ? error.message : fallback;
+}
+
 export async function getClients(): Promise<Client[]> {
   if (!supabase) return readLocal(CLIENTS_KEY, seedClients);
   const { data, error } = await supabase.from("clients").select("*").eq("hidden_in_app", false).order("name");
@@ -77,7 +88,7 @@ export async function savePost(input: PostInput, postId?: string): Promise<Post>
     return post;
   }
   const { data, error } = await supabase.functions.invoke("posts", { body: { action: "save", input, postId } });
-  if (error) throw error;
+  if (error) throw new Error(await functionErrorMessage(error, "Não foi possível salvar o post. Tente novamente."));
   if (data?.error) throw new Error(data.error);
   return { ...data, images: [] } as Post;
 }
@@ -88,7 +99,7 @@ export async function deletePost(postId: string) {
     return;
   }
   const { data, error } = await supabase.functions.invoke("posts", { body: { action: "delete", postId } });
-  if (error) throw error;
+  if (error) throw new Error(await functionErrorMessage(error, "Não foi possível excluir o post."));
   if (data?.error) throw new Error(data.error);
 }
 
