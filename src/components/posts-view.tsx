@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarDays, ChevronRight, CopyPlus, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CalendarDays, ChevronDown, ChevronRight, CopyPlus, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { Client, Post, PostInput, PostStatus } from "@/types";
 import { PLATFORMS, POST_TYPES, STATUSES } from "@/types";
 import { Button, EmptyState, inputClass } from "./ui";
@@ -32,6 +32,11 @@ export function PostsView({ posts, clients, onNew, onOpen, onQuickUpdate, onDupl
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
   const [platform, setPlatform] = useState("");
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExpandedGroup(client || null);
+  }, [client]);
 
   const filtered = useMemo(
     () => posts.filter((post) =>
@@ -116,13 +121,15 @@ export function PostsView({ posts, clients, onNew, onOpen, onQuickUpdate, onDupl
       ) : (
         <div className="space-y-6">
           {groups.map((group) => (
-            <section key={group.client?.id || "sem-cliente"}>
-              <div className="mb-2 flex items-center gap-2 px-1">
-                <span className="size-3 rounded-full" style={{ background: group.client?.color || "#AAA" }} />
-                <h2 className="font-display text-lg font-extrabold">{group.client?.name || "Sem cliente"}</h2>
+            <section key={group.client?.id || "sem-cliente"} className="overflow-hidden rounded-3xl border border-[#E0E0DA] bg-white">
+              {(() => { const groupKey = group.client?.id || "sem-cliente"; const expanded = expandedGroup === groupKey; return <>
+              <button onClick={() => setExpandedGroup(expanded ? null : groupKey)} className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-[#F5F5F1] sm:px-5">
+                <span className="size-3 shrink-0 rounded-full" style={{ background: group.client?.color || "#AAA" }} />
+                <h2 className="font-display min-w-0 flex-1 truncate text-lg font-extrabold">{group.client?.name || "Sem cliente"}</h2>
                 <span className="rounded-full bg-[#E8E8E2] px-2.5 py-1 text-xs font-bold text-[#66665F]">{group.posts.length}</span>
-              </div>
-              <div className="overflow-hidden rounded-3xl border border-[#E0E0DA] bg-white">
+                {expanded ? <ChevronDown size={19} className="text-[#77776F]" /> : <ChevronRight size={19} className="text-[#77776F]" />}
+              </button>
+              {expanded && <div className="animate-rise overflow-hidden border-t border-[#E8E8E2]">
                 <div className="hidden grid-cols-[minmax(220px,1fr)_145px_155px_44px] border-b border-[#E8E8E2] bg-[#F2F2EE] px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[#77776F] md:grid">
                   <span>Conteúdo</span><span>Status</span><span>Data</span><span />
                 </div>
@@ -144,7 +151,8 @@ export function PostsView({ posts, clients, onNew, onOpen, onQuickUpdate, onDupl
                     <button aria-label={`Duplicar ${post.title}`} title="Duplicar post" onClick={() => void onDuplicate(post)} className="grid size-10 place-items-center rounded-xl border border-[#DEDED8] bg-white hover:border-black"><CopyPlus size={17} /></button>
                   </div>
                 ))}
-              </div>
+              </div>}
+              </>; })()}
             </section>
           ))}
         </div>
