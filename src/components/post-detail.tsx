@@ -32,7 +32,7 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
       if (!response.ok) throw new Error(`Não foi possível carregar ${image.name}.`);
       const blob = await response.blob();
       const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-      const name = image.name || `${String(index + 1).padStart(2, "0")}-${post.title}.${extension}`;
+      const name = image.name || `${String(index + 1).padStart(2, "0")}-arte.${extension}`;
       return new File([blob], name, { type: blob.type || "image/png" });
     }));
   }
@@ -45,7 +45,7 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
         alert("Este navegador não consegue compartilhar várias imagens. Use “Baixar todas” ou abra o PostFlow pelo celular.");
         return;
       }
-      await navigator.share({ files, title: post.title });
+      await navigator.share({ files });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       alert(error instanceof Error ? error.message : "Não foi possível compartilhar as artes.");
@@ -74,14 +74,14 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
     }
   }
 
-  function TextSection({ title, text, id }: { title: string; text: string; id: string }) {
+  function TextSection({ title, text, id, copyLabel = "Copiar" }: { title: string; text: string; id: string; copyLabel?: string }) {
     return (
       <section className="rounded-2xl border border-[#E2E2DC] bg-white p-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[#77776F]">{title}</h3>
           {text && (
-            <button onClick={() => copy(text, id)} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-[#F0F0EB]">
-              {copied === id ? <><Check size={14} />Copiado</> : <><Copy size={14} />Copiar</>}
+            <button onClick={() => copy(text, id)} className="flex items-center gap-1.5 rounded-lg bg-[#1D1D1B] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black">
+              {copied === id ? <><Check size={14} />Copiada</> : <><Copy size={14} />{copyLabel}</>}
             </button>
           )}
         </div>
@@ -91,8 +91,8 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#F7F7F4] lg:left-64">
-      <header className="flex h-17 items-center justify-between border-b border-[#E1E1DB] px-4 sm:px-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-[#F7F7F4] lg:left-64">
+      <header className="sticky top-0 z-10 flex h-17 items-center justify-between border-b border-[#E1E1DB] bg-[#F7F7F4]/95 px-4 backdrop-blur sm:px-8">
         <button onClick={onClose} className="flex items-center gap-2 text-sm font-semibold"><X size={19} />Fechar</button>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onEdit}><Edit3 size={16} /><span className="hidden sm:inline">Editar</span></Button>
@@ -144,7 +144,7 @@ export function PostDetail({ post, client, onClose, onEdit, onDelete, onDeleteIm
         )}
 
         <div className="grid gap-4">
-          <TextSection title="Legenda" text={post.caption} id="caption" />
+          <TextSection title="Legenda" text={post.caption} id="caption" copyLabel="Copiar legenda" />
           <TextSection title="Texto do post / carrossel" text={post.content} id="content" />
           <TextSection title="Observações" text={post.notes} id="notes" />
         </div>
