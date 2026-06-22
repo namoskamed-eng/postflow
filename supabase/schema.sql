@@ -44,6 +44,7 @@ alter table public.posts add column if not exists slug text;
 alter table public.posts add column if not exists notion_page_id text;
 alter table public.posts add column if not exists notion_archived boolean not null default false;
 create unique index if not exists posts_slug_unique on public.posts (slug) where slug is not null;
+create unique index if not exists posts_notion_page_unique on public.posts (notion_page_id) where notion_page_id is not null and notion_page_id <> '';
 
 create table if not exists public.post_images (
   id uuid primary key default gen_random_uuid(),

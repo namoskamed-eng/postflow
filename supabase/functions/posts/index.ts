@@ -1,7 +1,43 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { corsHeaders, createPostPage, json, notionRequest, replacePostContent, requireUser, trashPage } from "../_shared/common.ts";
+import { corsHeaders, createPostPage, json, listChildPages, notionRequest, replacePostContent, requireUser, trashPage } from "../_shared/common.ts";
 
 const BUCKET = "post-images";
+const PLATFORMS = ["Instagram", "TikTok", "YouTube Shorts", "Facebook", "LinkedIn", "Outro"];
+const TYPES = ["Reels", "Carrossel", "Estático", "Story", "Outro"];
+const STATUSES = ["Ideia", "Roteiro", "Arte", "Aprovação", "Agendado"];
+
+function metadata(markdown: string, label: string) {
+  const prefix = `**${label}:**`;
+  return markdown.split("\n").find((line) => line.trim().startsWith(prefix))?.trim().slice(prefix.length).trim() || "";
+}
+
+function section(markdown: string, heading: string) {
+  const marker = `## ${heading}`;
+  const start = markdown.indexOf(marker);
+  if (start < 0) return "";
+  const content = markdown.slice(start + marker.length).replace(/^\s+/, "");
+  const end = content.search(/\n##\s/);
+  const value = (end < 0 ? content : content.slice(0, end)).trim();
+  return value === "—" ? "" : value;
+}
+
+function postFromMarkdown(markdown: string, title: string, clientId: string) {
+  const plannedDate = metadata(markdown, "Data planejada");
+  const platform = metadata(markdown, "Plataforma");
+  const type = metadata(markdown, "Tipo");
+  const status = metadata(markdown, "Status");
+  return {
+    title,
+    client_id: clientId,
+    planned_date: /^\d{4}-\d{2}-\d{2}$/.test(plannedDate) ? plannedDate : null,
+    platform: PLATFORMS.includes(platform) ? platform : "Instagram",
+    type: TYPES.includes(type) ? type : "Outro",
+    status: STATUSES.includes(status) ? status : "Ideia",
+    caption: section(markdown, "Legenda"),
+    content: section(markdown, "Texto do post / carrossel"),
+    notes: section(markdown, "Observações"),
+  };
+}
 
 function storagePath(url: string) {
   const marker = `/storage/v1/object/public/${BUCKET}/`;
@@ -14,6 +50,43 @@ Deno.serve(async (request) => {
   try {
     const { admin } = await requireUser(request);
     const body = await request.json().catch(() => ({}));
+
+    if (body.action === "sync") {
+      const [clientsResult, postsResult] = await Promise.all([
+        admin.from("clients").select("id,name,notion_active_page_id").eq("hidden_in_app", false).neq("notion_active_page_id", ""),
+        admin.from("posts").select("id,notion_page_id"),
+      ]);
+      if (clientsResult.error) throw clientsResult.error;
+      if (postsResult.error) throw postsResult.error;
+      const byNotionPage = new Map((postsResult.data || []).filter((post) => post.notion_page_id).map((post) => [post.notion_page_id, post]));
+      let created = 0;
+      let updated = 0;
+      const errors: Array<{ title: string; message: string }> = [];
+
+      for (const client of clientsResult.data || []) {
+        const notionPosts = await listChildPages(client.notion_active_page_id);
+        for (const notionPost of notionPosts) {
+          try {
+            const markdownPage = await notionRequest(`/pages/${notionPost.id}/markdown`);
+            const input = postFromMarkdown(markdownPage.markdown || "", notionPost.title, client.id);
+            const existing = byNotionPage.get(notionPost.id);
+            if (existing) {
+              const { error } = await admin.from("posts").update({ ...input, notion_archived: false }).eq("id", existing.id);
+              if (error) throw error;
+              updated++;
+            } else {
+              const { data, error } = await admin.from("posts").insert({ ...input, notion_page_id: notionPost.id, notion_archived: false }).select("id,notion_page_id").single();
+              if (error) throw error;
+              byNotionPage.set(notionPost.id, data);
+              created++;
+            }
+          } catch (error) {
+            errors.push({ title: notionPost.title, message: error instanceof Error ? error.message : "Falha ao importar." });
+          }
+        }
+      }
+      return json({ created, updated, ignored: errors.length, errors });
+    }
 
     if (body.action === "save") {
       const { input, postId } = body;

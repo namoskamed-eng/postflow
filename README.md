@@ -83,6 +83,7 @@ O token do Notion fica somente nos secrets do Supabase e nunca é enviado ao nav
 
 - Ao criar um post no app, uma página de texto estruturado é criada dentro de `A POSTAR — POSTFLOW`.
 - Editar o post atualiza a mesma página no Notion.
+- Páginas criadas ou duplicadas diretamente dentro de `A POSTAR — POSTFLOW` são importadas para o app na atualização manual ou automática.
 - Ao selecionar o status **Publicado**, o app pede confirmação e move a própria página para `POSTADOS — POSTFLOW`.
 - Somente após a confirmação do Notion, as imagens são removidas do Storage e o post é apagado do PostFlow.
 - Se qualquer etapa falhar, o post permanece no app para uma nova tentativa.

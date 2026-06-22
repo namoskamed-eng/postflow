@@ -80,9 +80,12 @@ export default function Home() {
       const { data, error: syncError } = await supabase!.functions.invoke("clients", { body: { action: "sync" } });
       if (syncError) throw syncError;
       if (data?.error) throw new Error(data.error);
+      const { data: postData, error: postSyncError } = await supabase!.functions.invoke("posts", { body: { action: "sync" } });
+      if (postSyncError) throw postSyncError;
+      if (postData?.error) throw new Error(postData.error);
       localStorage.setItem(CLIENT_SYNC_SLOT_KEY, currentSyncSlot());
       await load();
-      if (notify) alert(`Clientes atualizados. ${data?.created || 0} novo(s) e ${data?.hidden || 0} ocultado(s) pela ausência de A POSTAR — POSTFLOW.`);
+      if (notify) alert(`Atualização concluída: ${data?.created || 0} cliente(s) novo(s), ${postData?.created || 0} post(s) importado(s) e ${postData?.updated || 0} atualizado(s).`);
     } catch (syncError) {
       if (notify) alert(syncError instanceof Error ? syncError.message : "Não foi possível atualizar os clientes.");
     } finally {
