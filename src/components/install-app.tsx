@@ -11,13 +11,22 @@ export function InstallAppButton({ compact = false }: { compact?: boolean }) {
   const [installed, setInstalled] = useState(false);
   useEffect(() => {
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-    if ("serviceWorker" in navigator) void navigator.serviceWorker.register(`${basePath}/sw.js`);
+    let refreshing = false;
+    const refreshOnUpdate = () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    };
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("controllerchange", refreshOnUpdate);
+      void navigator.serviceWorker.register(`${basePath}/sw.js?v=2`).then((registration) => registration.update());
+    }
     setInstalled(window.matchMedia("(display-mode: standalone)").matches);
     const capture = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPrompt); };
     const done = () => setInstalled(true);
     window.addEventListener("beforeinstallprompt", capture);
     window.addEventListener("appinstalled", done);
-    return () => { window.removeEventListener("beforeinstallprompt", capture); window.removeEventListener("appinstalled", done); };
+    return () => { window.removeEventListener("beforeinstallprompt", capture); window.removeEventListener("appinstalled", done); navigator.serviceWorker?.removeEventListener("controllerchange", refreshOnUpdate); };
   }, []);
   if (installed) return null;
   async function install() {
