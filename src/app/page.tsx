@@ -16,7 +16,8 @@ import { BoardView } from "@/components/board-view";
 import { TemplatesView } from "@/components/templates-view";
 import { IdeasQuick } from "@/components/ideas-quick";
 import { PublicationMode } from "@/components/publication-mode";
-import { deleteClient, deleteIdea, deletePost, deletePostImage, deleteTemplate, getClients, getIdeas, getPosts, getTemplates, saveClient, saveIdea, savePost, saveTemplate, uploadPostImages } from "@/lib/data";
+import { RecentPublishedView } from "@/components/recent-published-view";
+import { deleteClient, deleteIdea, deletePost, deletePostImage, deleteTemplate, getClients, getIdeas, getPosts, getRecentPublishedPosts, getTemplates, saveClient, saveIdea, savePost, saveTemplate, uploadPostImages } from "@/lib/data";
 import { hasSupabase, supabase } from "@/lib/supabase";
 import type { Client, ClientInput, Idea, IdeaInput, Post, PostInput, PostStatus, PostTemplate, PostTemplateInput } from "@/types";
 
@@ -48,6 +49,7 @@ export default function Home() {
   const [view, setView] = useState<View>("today");
   const [clients, setClients] = useState<Client[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [templates, setTemplates] = useState<PostTemplate[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,14 +65,16 @@ export default function Home() {
   const [draftPost, setDraftPost] = useState<Partial<PostInput> | undefined>();
   const [convertingIdeaId, setConvertingIdeaId] = useState<string | null>(null);
   const [publicationMode, setPublicationMode] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   async function load() {
     try {
       setError("");
-      const [loadedClients, loadedPosts, loadedTemplates, loadedIdeas] = await Promise.all([getClients(), getPosts(), getTemplates(), getIdeas()]);
+      const [loadedClients, loadedPosts, loadedRecentPosts, loadedTemplates, loadedIdeas] = await Promise.all([getClients(), getPosts(), getRecentPublishedPosts(), getTemplates(), getIdeas()]);
       const visibleClientIds = new Set(loadedClients.map((client) => client.id));
       setClients(loadedClients);
       setPosts(loadedPosts.filter((post) => visibleClientIds.has(post.client_id)));
+      setRecentPosts(loadedRecentPosts.filter((post) => visibleClientIds.has(post.client_id)));
       setTemplates(loadedTemplates);
       setIdeas(loadedIdeas);
     } catch (loadError) {
@@ -263,6 +267,23 @@ export default function Home() {
     }
   }
 
+  async function handleRestore(post: Post) {
+    if (!confirm(`Restaurar “${post.title}”? Ele voltará para A POSTAR — POSTFLOW com o status Agendado.`)) return;
+    setRestoringId(post.id);
+    try {
+      const { data, error: restoreError } = await supabase!.functions.invoke("archive-post", { body: { action: "restore", postId: post.id } });
+      if (restoreError) throw restoreError;
+      if (data?.error) throw new Error(data.error);
+      await load();
+      setView("posts");
+      alert("Post restaurado com as imagens e movido para A POSTAR — POSTFLOW.");
+    } catch (restoreError) {
+      alert(restoreError instanceof Error ? restoreError.message : "Não foi possível restaurar o post.");
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
   async function handleTemplate(input: PostTemplateInput, templateId?: string) {
     await saveTemplate(input, templateId);
     await load();
@@ -295,11 +316,12 @@ export default function Home() {
   }
 
   function renderView() {
-    if (view === "today") return <DashboardView posts={posts} clients={clients} onOpen={setDetail} onNew={() => openPost()} onCalendar={() => setView("calendar")} onPublication={() => setPublicationMode(true)} />;
+    if (view === "today") return <DashboardView posts={posts} clients={clients} recentCount={recentPosts.length} onOpen={setDetail} onNew={() => openPost()} onCalendar={() => setView("calendar")} onPublication={() => setPublicationMode(true)} onRecent={() => setView("recent")} />;
     if (view === "posts") return <PostsView posts={posts} clients={clients} onNew={() => openPost()} onOpen={setDetail} onQuickUpdate={handleQuickUpdate} onDuplicate={handleDuplicate} />;
     if (view === "calendar") return <CalendarView posts={posts} clients={clients} onOpen={setDetail} />;
     if (view === "board") return <BoardView posts={posts} clients={clients} onOpen={setDetail} onStatusChange={(post, status: PostStatus) => handleQuickUpdate(post, { status })} />;
     if (view === "templates") return <TemplatesView templates={templates} onSave={handleTemplate} onDelete={handleDeleteTemplate} />;
+    if (view === "recent") return <RecentPublishedView posts={recentPosts} clients={clients} restoringId={restoringId} onRestore={handleRestore} />;
     return <ClientsView clients={clients} posts={posts} syncing={syncing} onSync={handleSyncClients} onNew={() => openClient()} onEdit={openClient} onDelete={handleDeleteClient} onOpen={setClientDetail} />;
   }
 

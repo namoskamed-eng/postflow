@@ -60,6 +60,14 @@ export async function getPosts(): Promise<Post[]> {
   return data as Post[];
 }
 
+export async function getRecentPublishedPosts(): Promise<Post[]> {
+  if (!supabase) return [];
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from("posts").select("*, images:post_images(*)").eq("notion_archived", true).gte("published_at", cutoff).order("published_at", { ascending: false });
+  if (error) throw error;
+  return data as Post[];
+}
+
 export async function savePost(input: PostInput, postId?: string): Promise<Post> {
   if (!supabase) {
     const posts = readLocal(POSTS_KEY, seedPosts);

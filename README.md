@@ -91,6 +91,7 @@ O token do Notion fica somente nos secrets do Supabase e nunca é enviado ao nav
 - Ao selecionar o status **Publicado**, o app pede confirmação e move a própria página para `POSTADOS — POSTFLOW`.
 - Depois da confirmação do Notion, o post sai imediatamente da área ativa do PostFlow.
 - As imagens permanecem guardadas por 7 dias como margem de segurança. Na primeira atualização automática ou manual após esse prazo, elas são removidas do Storage e o registro temporário é apagado.
+- Durante esse prazo, o post aparece em **Publicados recentemente** e pode ser restaurado com todas as imagens. Ao restaurar, ele volta para `A POSTAR — POSTFLOW` com o status **Agendado**.
 - Se qualquer etapa falhar, o post permanece no app para uma nova tentativa.
 - O ID da página criada é salvo antes da limpeza, evitando duplicação caso apenas a exclusão das imagens falhe.
 

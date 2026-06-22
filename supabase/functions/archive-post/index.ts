@@ -45,6 +45,28 @@ Deno.serve(async (request) => {
       return json({ cleaned, errors });
     }
 
+    if (body.action === "restore") {
+      if (!body.postId) return json({ error: "Post inválido." }, 400);
+      const { data: archived, error: archivedError } = await admin.from("posts")
+        .select("*, client:clients(name,notion_active_page_id)")
+        .eq("id", body.postId)
+        .single();
+      if (archivedError || !archived) throw archivedError || new Error("Post não encontrado.");
+      if (!archived.notion_archived) return json({ restored: true });
+      if (!archived.client?.notion_active_page_id) throw new Error(`O cliente ${archived.client?.name || "selecionado"} não possui a pasta A POSTAR — POSTFLOW.`);
+      if (!archived.notion_page_id) throw new Error("A página deste post não foi encontrada no Notion.");
+
+      const restoredPost = { ...archived, status: "Agendado" };
+      await replacePostContent(archived.notion_page_id, restoredPost, archived.client.name);
+      await notionRequest(`/pages/${archived.notion_page_id}/move`, {
+        method: "POST",
+        body: JSON.stringify({ parent: { type: "page_id", page_id: archived.client.notion_active_page_id } }),
+      });
+      const { error: restoreError } = await admin.from("posts").update({ notion_archived: false, published_at: null, status: "Agendado" }).eq("id", body.postId);
+      if (restoreError) throw restoreError;
+      return json({ restored: true });
+    }
+
     const { postId, post } = body;
     if (!postId || !post) return json({ error: "Post inválido." }, 400);
     const { data, error } = await admin.from("posts").select("*, images:post_images(url,name), client:clients(name,notion_archive_page_id)").eq("id", postId).single();
