@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, createPostPage, json, notionRequest, replacePostContent, requireUser } from "../_shared/common.ts";
 
 const BUCKET = "post-images";
+const RETENTION_DAYS = 7;
 
 function storagePath(url: string) {
   const marker = `/storage/v1/object/public/${BUCKET}/`;
@@ -13,7 +14,38 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const { admin } = await requireUser(request);
-    const { postId, post } = await request.json();
+    const body = await request.json().catch(() => ({}));
+
+    if (body.action === "cleanup") {
+      const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      const { data: expiredPosts, error: expiredError } = await admin
+        .from("posts")
+        .select("id, images:post_images(url)")
+        .eq("notion_archived", true)
+        .not("published_at", "is", null)
+        .lte("published_at", cutoff);
+      if (expiredError) throw expiredError;
+
+      let cleaned = 0;
+      const errors: Array<{ postId: string; message: string }> = [];
+      for (const expired of expiredPosts || []) {
+        try {
+          const paths = (expired.images || []).map((image: { url: string }) => storagePath(image.url)).filter(Boolean) as string[];
+          if (paths.length) {
+            const { error: removeError } = await admin.storage.from(BUCKET).remove(paths);
+            if (removeError) throw removeError;
+          }
+          const { error: deleteError } = await admin.from("posts").delete().eq("id", expired.id);
+          if (deleteError) throw deleteError;
+          cleaned++;
+        } catch (error) {
+          errors.push({ postId: expired.id, message: error instanceof Error ? error.message : "Falha na limpeza." });
+        }
+      }
+      return json({ cleaned, errors });
+    }
+
+    const { postId, post } = body;
     if (!postId || !post) return json({ error: "Post inválido." }, 400);
     const { data, error } = await admin.from("posts").select("*, images:post_images(url,name), client:clients(name,notion_archive_page_id)").eq("id", postId).single();
     if (error || !data) throw error || new Error("Post não encontrado.");
@@ -31,18 +63,20 @@ Deno.serve(async (request) => {
           body: JSON.stringify({ parent: { type: "page_id", page_id: data.client.notion_archive_page_id } }),
         });
       }
-      const { error: markError } = await admin.from("posts").update({ notion_page_id: notionPageId, notion_archived: true }).eq("id", postId);
+      const { error: markError } = await admin.from("posts").update({
+        notion_page_id: notionPageId,
+        notion_archived: true,
+        published_at: data.published_at || new Date().toISOString(),
+        status: "Publicado",
+      }).eq("id", postId);
       if (markError) throw markError;
+    } else if (!data.published_at) {
+      const { error: dateError } = await admin.from("posts").update({ published_at: new Date().toISOString() }).eq("id", postId);
+      if (dateError) throw dateError;
     }
-
-    const paths = (data.images || []).map((image: { url: string }) => storagePath(image.url)).filter(Boolean) as string[];
-    if (paths.length) {
-      const { error: removeError } = await admin.storage.from(BUCKET).remove(paths);
-      if (removeError) throw removeError;
-    }
-    const { error: deleteError } = await admin.from("posts").delete().eq("id", postId);
-    if (deleteError) throw deleteError;
-    return json({ archived: true, notionPageId });
+    const publishedAt = data.published_at || new Date().toISOString();
+    const cleanupScheduledFor = new Date(new Date(publishedAt).getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    return json({ archived: true, notionPageId, cleanupScheduledFor });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível arquivar o post.";
     return json({ error: message }, message === "Sessão inválida." ? 401 : 500);

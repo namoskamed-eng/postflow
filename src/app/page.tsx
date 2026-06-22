@@ -90,9 +90,12 @@ export default function Home() {
       const { data: postData, error: postSyncError } = await supabase!.functions.invoke("posts", { body: { action: "sync" } });
       if (postSyncError) throw postSyncError;
       if (postData?.error) throw new Error(postData.error);
+      const { data: cleanupData, error: cleanupError } = await supabase!.functions.invoke("archive-post", { body: { action: "cleanup" } });
+      if (cleanupError) throw cleanupError;
+      if (cleanupData?.error) throw new Error(cleanupData.error);
       localStorage.setItem(CLIENT_SYNC_SLOT_KEY, currentSyncSlot());
       await load();
-      if (notify) alert(`Atualização concluída: ${data?.created || 0} cliente(s) novo(s), ${postData?.created || 0} post(s) importado(s) e ${postData?.updated || 0} atualizado(s).`);
+      if (notify) alert(`Atualização concluída: ${data?.created || 0} cliente(s) novo(s), ${postData?.created || 0} post(s) importado(s), ${postData?.updated || 0} atualizado(s) e ${cleanupData?.cleaned || 0} limpeza(s) de imagens antigas.`);
     } catch (syncError) {
       if (notify) alert(syncError instanceof Error ? syncError.message : "Não foi possível atualizar os clientes.");
     } finally {
@@ -181,7 +184,7 @@ export default function Home() {
         alert("O arquivamento precisa do Supabase configurado. O post não foi alterado.");
         return;
       }
-      if (!confirm("Ao continuar, o post será arquivado no Notion e removido do PostFlow junto com todas as imagens. Deseja continuar?")) return;
+      if (!confirm("Ao continuar, o post será arquivado no Notion e sairá da área ativa. As imagens ficarão guardadas por 7 dias antes da limpeza automática. Deseja continuar?")) return;
     }
     try {
       const saved = await savePost(input, editingPost?.id);
@@ -190,7 +193,7 @@ export default function Home() {
         const { data, error: archiveError } = await supabase!.functions.invoke("archive-post", { body: { postId: saved.id, post: input } });
         if (archiveError) throw archiveError;
         if (data?.error) throw new Error(data.error);
-        alert("Post arquivado no Notion e removido do PostFlow com sucesso.");
+        alert("Post arquivado no Notion. As imagens ficarão guardadas por 7 dias antes de serem apagadas.");
       }
       if (convertingIdeaId) await deleteIdea(convertingIdeaId);
       setPostModal(false);
@@ -234,7 +237,7 @@ export default function Home() {
   async function handleQuickUpdate(post: Post, changes: Partial<PostInput>, skipConfirmation = false) {
     const input = inputFromPost(post, changes);
     if (input.status === "Publicado" && !skipConfirmation) {
-      if (!confirm("Marcar como publicado? A página será movida para POSTADOS e as imagens serão removidas do app.")) return;
+      if (!confirm("Marcar como publicado? A página será movida para POSTADOS e as imagens serão apagadas somente após 7 dias.")) return;
     }
     try {
       const saved = await savePost(input, post.id);

@@ -71,11 +71,11 @@ Deno.serve(async (request) => {
             const input = postFromMarkdown(markdownPage.markdown || "", notionPost.title, client.id);
             const existing = byNotionPage.get(notionPost.id);
             if (existing) {
-              const { error } = await admin.from("posts").update({ ...input, notion_archived: false }).eq("id", existing.id);
+              const { error } = await admin.from("posts").update({ ...input, notion_archived: false, published_at: null }).eq("id", existing.id);
               if (error) throw error;
               updated++;
             } else {
-              const { data, error } = await admin.from("posts").insert({ ...input, notion_page_id: notionPost.id, notion_archived: false }).select("id,notion_page_id").single();
+              const { data, error } = await admin.from("posts").insert({ ...input, notion_page_id: notionPost.id, notion_archived: false, published_at: null }).select("id,notion_page_id").single();
               if (error) throw error;
               byNotionPage.set(notionPost.id, data);
               created++;
@@ -111,13 +111,13 @@ Deno.serve(async (request) => {
             });
           }
         }
-        const { data, error } = await admin.from("posts").update({ ...input, notion_page_id: notionPageId, notion_archived: false }).eq("id", postId).select().single();
+        const { data, error } = await admin.from("posts").update({ ...input, notion_page_id: notionPageId, notion_archived: false, published_at: null }).eq("id", postId).select().single();
         if (error) throw error;
         return json(data);
       }
 
       const page = await createPostPage(client.notion_active_page_id, input, client.name);
-      const { data, error } = await admin.from("posts").insert({ ...input, notion_page_id: page.id, notion_archived: false }).select().single();
+      const { data, error } = await admin.from("posts").insert({ ...input, notion_page_id: page.id, notion_archived: false, published_at: null }).select().single();
       if (error) {
         await trashPage(page.id).catch(() => undefined);
         throw error;

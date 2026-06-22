@@ -27,6 +27,7 @@ create table if not exists public.posts (
   slug text,
   notion_page_id text,
   notion_archived boolean not null default false,
+  published_at timestamptz,
   client_id uuid not null references public.clients(id) on delete cascade,
   title text not null,
   planned_date date,
@@ -43,6 +44,7 @@ create table if not exists public.posts (
 alter table public.posts add column if not exists slug text;
 alter table public.posts add column if not exists notion_page_id text;
 alter table public.posts add column if not exists notion_archived boolean not null default false;
+alter table public.posts add column if not exists published_at timestamptz;
 create unique index if not exists posts_slug_unique on public.posts (slug) where slug is not null;
 create unique index if not exists posts_notion_page_unique on public.posts (notion_page_id) where notion_page_id is not null and notion_page_id <> '';
 

@@ -38,6 +38,8 @@ export interface Post {
   caption: string;
   content: string;
   notes: string;
+  notion_archived?: boolean;
+  published_at?: string | null;
   created_at: string;
   images: PostImage[];
 }

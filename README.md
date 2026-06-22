@@ -89,7 +89,8 @@ O token do Notion fica somente nos secrets do Supabase e nunca é enviado ao nav
 - Editar o post atualiza a mesma página no Notion.
 - Páginas criadas ou duplicadas diretamente dentro de `A POSTAR — POSTFLOW` são importadas para o app na atualização manual ou automática.
 - Ao selecionar o status **Publicado**, o app pede confirmação e move a própria página para `POSTADOS — POSTFLOW`.
-- Somente após a confirmação do Notion, as imagens são removidas do Storage e o post é apagado do PostFlow.
+- Depois da confirmação do Notion, o post sai imediatamente da área ativa do PostFlow.
+- As imagens permanecem guardadas por 7 dias como margem de segurança. Na primeira atualização automática ou manual após esse prazo, elas são removidas do Storage e o registro temporário é apagado.
 - Se qualquer etapa falhar, o post permanece no app para uma nova tentativa.
 - O ID da página criada é salvo antes da limpeza, evitando duplicação caso apenas a exclusão das imagens falhe.
 

@@ -55,7 +55,7 @@ export async function deleteClient(clientId: string) {
 
 export async function getPosts(): Promise<Post[]> {
   if (!supabase) return readLocal(POSTS_KEY, seedPosts);
-  const { data, error } = await supabase.from("posts").select("*, images:post_images(*)").order("planned_date");
+  const { data, error } = await supabase.from("posts").select("*, images:post_images(*)").eq("notion_archived", false).order("planned_date");
   if (error) throw error;
   return data as Post[];
 }
