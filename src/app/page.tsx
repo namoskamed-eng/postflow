@@ -14,9 +14,11 @@ import { DashboardView } from "@/components/dashboard-view";
 import { CalendarView } from "@/components/calendar-view";
 import { BoardView } from "@/components/board-view";
 import { TemplatesView } from "@/components/templates-view";
-import { deleteClient, deletePost, deletePostImage, deleteTemplate, getClients, getPosts, getTemplates, saveClient, savePost, saveTemplate, uploadPostImages } from "@/lib/data";
+import { IdeasQuick } from "@/components/ideas-quick";
+import { PublicationMode } from "@/components/publication-mode";
+import { deleteClient, deleteIdea, deletePost, deletePostImage, deleteTemplate, getClients, getIdeas, getPosts, getTemplates, saveClient, saveIdea, savePost, saveTemplate, uploadPostImages } from "@/lib/data";
 import { hasSupabase, supabase } from "@/lib/supabase";
-import type { Client, ClientInput, Post, PostInput, PostStatus, PostTemplate, PostTemplateInput } from "@/types";
+import type { Client, ClientInput, Idea, IdeaInput, Post, PostInput, PostStatus, PostTemplate, PostTemplateInput } from "@/types";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const CLIENT_SYNC_SLOT_KEY = "postflow_client_sync_slot";
@@ -47,6 +49,7 @@ export default function Home() {
   const [clients, setClients] = useState<Client[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [templates, setTemplates] = useState<PostTemplate[]>([]);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
@@ -57,15 +60,19 @@ export default function Home() {
   const [detail, setDetail] = useState<Post | null>(null);
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
   const [newPostClientId, setNewPostClientId] = useState<string | undefined>();
+  const [draftPost, setDraftPost] = useState<Partial<PostInput> | undefined>();
+  const [convertingIdeaId, setConvertingIdeaId] = useState<string | null>(null);
+  const [publicationMode, setPublicationMode] = useState(false);
 
   async function load() {
     try {
       setError("");
-      const [loadedClients, loadedPosts, loadedTemplates] = await Promise.all([getClients(), getPosts(), getTemplates()]);
+      const [loadedClients, loadedPosts, loadedTemplates, loadedIdeas] = await Promise.all([getClients(), getPosts(), getTemplates(), getIdeas()]);
       const visibleClientIds = new Set(loadedClients.map((client) => client.id));
       setClients(loadedClients);
       setPosts(loadedPosts.filter((post) => visibleClientIds.has(post.client_id)));
       setTemplates(loadedTemplates);
+      setIdeas(loadedIdeas);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar os dados.");
     } finally {
@@ -138,6 +145,8 @@ export default function Home() {
   function openPost(post?: Post, clientId?: string) {
     setEditingPost(post || null);
     setNewPostClientId(post?.client_id || clientId);
+    setDraftPost(undefined);
+    setConvertingIdeaId(null);
     setPostModal(true);
   }
 
@@ -183,8 +192,11 @@ export default function Home() {
         if (data?.error) throw new Error(data.error);
         alert("Post arquivado no Notion e removido do PostFlow com sucesso.");
       }
+      if (convertingIdeaId) await deleteIdea(convertingIdeaId);
       setPostModal(false);
       setDetail(null);
+      setDraftPost(undefined);
+      setConvertingIdeaId(null);
       await load();
     } catch (postError) {
       alert(postError instanceof Error ? postError.message : "Não foi possível salvar o post.");
@@ -219,9 +231,9 @@ export default function Home() {
     return { title: post.title, client_id: post.client_id, planned_date: post.planned_date, platform: post.platform, type: post.type, status: post.status, caption: post.caption, content: post.content, notes: post.notes, ...changes };
   }
 
-  async function handleQuickUpdate(post: Post, changes: Partial<PostInput>) {
+  async function handleQuickUpdate(post: Post, changes: Partial<PostInput>, skipConfirmation = false) {
     const input = inputFromPost(post, changes);
-    if (input.status === "Publicado") {
+    if (input.status === "Publicado" && !skipConfirmation) {
       if (!confirm("Marcar como publicado? A página será movida para POSTADOS e as imagens serão removidas do app.")) return;
     }
     try {
@@ -259,8 +271,28 @@ export default function Home() {
     await load();
   }
 
+  async function handleIdea(input: IdeaInput) {
+    await saveIdea(input);
+    await load();
+  }
+
+  async function handleDeleteIdea(idea: Idea) {
+    if (!confirm(`Excluir a ideia “${idea.title}”?`)) return;
+    await deleteIdea(idea.id);
+    await load();
+  }
+
+  function handleConvertIdea(idea: Idea) {
+    const links = idea.links.length ? `Referências:\n${idea.links.join("\n")}` : "";
+    setEditingPost(null);
+    setNewPostClientId(idea.client_id || undefined);
+    setDraftPost({ title: idea.title, client_id: idea.client_id || clients[0]?.id || "", content: idea.text, notes: links, status: "Ideia" });
+    setConvertingIdeaId(idea.id);
+    setPostModal(true);
+  }
+
   function renderView() {
-    if (view === "today") return <DashboardView posts={posts} clients={clients} onOpen={setDetail} onNew={() => openPost()} onCalendar={() => setView("calendar")} />;
+    if (view === "today") return <DashboardView posts={posts} clients={clients} onOpen={setDetail} onNew={() => openPost()} onCalendar={() => setView("calendar")} onPublication={() => setPublicationMode(true)} />;
     if (view === "posts") return <PostsView posts={posts} clients={clients} onNew={() => openPost()} onOpen={setDetail} onQuickUpdate={handleQuickUpdate} onDuplicate={handleDuplicate} />;
     if (view === "calendar") return <CalendarView posts={posts} clients={clients} onOpen={setDetail} />;
     if (view === "board") return <BoardView posts={posts} clients={clients} onOpen={setDetail} onStatusChange={(post, status: PostStatus) => handleQuickUpdate(post, { status })} />;
@@ -284,9 +316,11 @@ export default function Home() {
         </div>
       </main>
       <Modal open={clientModal} onClose={() => setClientModal(false)} title={editingClient ? "Editar cliente" : "Novo cliente"}><ClientForm client={editingClient} onSave={handleClient} onCancel={() => setClientModal(false)} /></Modal>
-      <Modal open={postModal} onClose={() => setPostModal(false)} title={editingPost ? "Editar postagem" : "Nova postagem"} wide><PostForm post={editingPost} clients={clients} templates={templates} defaultClientId={newPostClientId} onSave={handlePost} onCancel={() => setPostModal(false)} /></Modal>
+      <Modal open={postModal} onClose={() => setPostModal(false)} title={editingPost ? "Editar postagem" : "Nova postagem"} wide><PostForm post={editingPost} clients={clients} templates={templates} defaultClientId={newPostClientId} draft={draftPost} onSave={handlePost} onCancel={() => setPostModal(false)} /></Modal>
       {clientDetail && <ClientDetail client={clients.find((client) => client.id === clientDetail.id) || clientDetail} posts={posts.filter((post) => post.client_id === clientDetail.id)} onClose={() => setClientDetail(null)} onEdit={() => openClient(clientDetail)} onNewPost={() => openPost(undefined, clientDetail.id)} onOpenPost={setDetail} />}
       {detail && <PostDetail post={posts.find((post) => post.id === detail.id) || detail} client={clients.find((client) => client.id === detail.client_id)} onClose={() => setDetail(null)} onEdit={() => openPost(detail)} onDelete={() => handleDeletePost(detail)} onDeleteImage={(id) => handleDeleteImage(detail, id)} />}
+      <IdeasQuick ideas={ideas} clients={clients} onSave={handleIdea} onDelete={handleDeleteIdea} onConvert={handleConvertIdea} />
+      {publicationMode && <PublicationMode posts={posts} clients={clients} onClose={() => setPublicationMode(false)} onPublish={(post) => handleQuickUpdate(post, { status: "Publicado" }, true)} />}
     </div>
   );
 }

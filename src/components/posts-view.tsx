@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { CalendarDays, ChevronDown, ChevronRight, CopyPlus, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -39,14 +40,16 @@ export function PostsView({ posts, clients, onNew, onOpen, onQuickUpdate, onDupl
   }, [client]);
 
   const filtered = useMemo(
-    () => posts.filter((post) =>
-      (!search || post.title.toLowerCase().includes(search.toLowerCase())) &&
+    () => posts.filter((post) => {
+      const clientName = clients.find((item) => item.id === post.client_id)?.name || "";
+      const searchable = [post.title, clientName, post.caption, post.content, post.notes, post.platform, post.type, post.status].join(" ").toLocaleLowerCase("pt-BR");
+      return (!search || searchable.includes(search.toLocaleLowerCase("pt-BR"))) &&
       (!client || post.client_id === client) &&
       (!status || post.status === status) &&
       (!type || post.type === type) &&
-      (!platform || post.platform === platform)
-    ),
-    [posts, search, client, status, type, platform],
+      (!platform || post.platform === platform);
+    }),
+    [posts, clients, search, client, status, type, platform],
   );
 
   const groups = useMemo(() => {
@@ -142,9 +145,10 @@ export function PostsView({ posts, clients, onNew, onOpen, onQuickUpdate, onDupl
                     )}
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
-                    <button onClick={() => onOpen(post)} className="min-w-0 text-left">
-                      <h3 className="truncate font-display text-[15px] font-extrabold">{post.title}</h3>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-[#81817A]">{post.platform} · {post.type}<ChevronRight size={14} /></p>
+                    <button onClick={() => onOpen(post)} className="flex min-w-0 items-center gap-3 text-left">
+                      {post.images[0] ? <img src={post.images[0].url} alt="" className="size-11 shrink-0 rounded-xl object-cover" /> : <div className="size-11 shrink-0 rounded-xl bg-[#ECECE7]" />}
+                      <div className="min-w-0"><h3 className="truncate font-display text-[15px] font-extrabold">{post.title}</h3>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-[#81817A]">{post.platform} · {post.type}<ChevronRight size={14} /></p></div>
                     </button>
                     <select aria-label={`Status de ${post.title}`} value={post.status} onChange={(event) => void onQuickUpdate(post, { status: event.target.value as PostStatus })} className={cn("h-10 rounded-xl border-0 px-2 text-xs font-bold outline-none", statusStyle[post.status])}>{STATUSES.map((item) => <option key={item}>{item}</option>)}</select>
                     <input aria-label={`Data de ${post.title}`} type="date" value={post.planned_date || ""} onChange={(event) => void onQuickUpdate(post, { planned_date: event.target.value })} className="h-10 rounded-xl border border-[#DEDED8] bg-white px-2 text-xs" />

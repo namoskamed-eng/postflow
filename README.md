@@ -24,6 +24,10 @@ Aplicação web responsiva para organizar o fluxo de postagens de vários client
 - Alertas no navegador para posts do dia e atrasados
 - Modelos reutilizáveis de Carrossel, Reels e Post estático
 - Instalação como aplicativo na tela inicial do celular
+- Caixa de Ideias rápida com cliente opcional, vários links e ditado por voz
+- Conversão de ideias em postagens com formulário já preenchido
+- Modo Publicação com fila, envio de imagens, cópia de legenda e avanço automático
+- Miniatura da capa e busca em título, cliente, legenda, roteiro e observações
 
 ## Rodar localmente
 

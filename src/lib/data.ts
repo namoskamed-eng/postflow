@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Client, ClientInput, Post, PostImage, PostInput, PostTemplate, PostTemplateInput } from "@/types";
+import type { Client, ClientInput, Idea, IdeaInput, Post, PostImage, PostInput, PostTemplate, PostTemplateInput } from "@/types";
 
 const CLIENTS_KEY = "postflow_clients";
 const POSTS_KEY = "postflow_posts";
@@ -145,5 +145,34 @@ export async function deleteTemplate(templateId: string) {
     return;
   }
   const { error } = await supabase.from("post_templates").delete().eq("id", templateId);
+  if (error) throw error;
+}
+
+export async function getIdeas(): Promise<Idea[]> {
+  if (!supabase) return readLocal<Idea[]>("postflow_ideas", []);
+  const { data, error } = await supabase.from("ideas").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as Idea[];
+}
+
+export async function saveIdea(input: IdeaInput, ideaId?: string): Promise<Idea> {
+  if (!supabase) {
+    const ideas = readLocal<Idea[]>("postflow_ideas", []);
+    const idea = { ...input, id: ideaId || id(), created_at: ideas.find((item) => item.id === ideaId)?.created_at || new Date().toISOString() };
+    writeLocal("postflow_ideas", ideaId ? ideas.map((item) => item.id === ideaId ? idea : item) : [idea, ...ideas]);
+    return idea;
+  }
+  const query = ideaId ? supabase.from("ideas").update(input).eq("id", ideaId) : supabase.from("ideas").insert(input);
+  const { data, error } = await query.select().single();
+  if (error) throw error;
+  return data as Idea;
+}
+
+export async function deleteIdea(ideaId: string) {
+  if (!supabase) {
+    writeLocal("postflow_ideas", readLocal<Idea[]>("postflow_ideas", []).filter((item) => item.id !== ideaId));
+    return;
+  }
+  const { error } = await supabase.from("ideas").delete().eq("id", ideaId);
   if (error) throw error;
 }

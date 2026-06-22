@@ -53,6 +53,16 @@ export interface PostTemplate {
   created_at: string;
 }
 
+export interface Idea {
+  id: string;
+  title: string;
+  client_id: string | null;
+  text: string;
+  links: string[];
+  created_at: string;
+}
+
 export type ClientInput = Omit<Client, "id" | "created_at">;
 export type PostInput = Omit<Post, "id" | "created_at" | "images">;
 export type PostTemplateInput = Omit<PostTemplate, "id" | "created_at">;
+export type IdeaInput = Omit<Idea, "id" | "created_at">;

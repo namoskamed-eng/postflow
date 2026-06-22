@@ -65,6 +65,15 @@ create table if not exists public.post_templates (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.ideas (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  client_id uuid references public.clients(id) on delete set null,
+  text text not null default '',
+  links text[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
 insert into storage.buckets (id, name, public) values ('post-images', 'post-images', true)
 on conflict (id) do update set public = true;
 
@@ -72,12 +81,14 @@ alter table public.clients enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_images enable row level security;
 alter table public.post_templates enable row level security;
+alter table public.ideas enable row level security;
 
 -- Somente usuários autenticados podem acessar os dados pelo navegador.
 drop policy if exists "public clients" on public.clients;
 drop policy if exists "public posts" on public.posts;
 drop policy if exists "public post images" on public.post_images;
 drop policy if exists "public post templates" on public.post_templates;
+drop policy if exists "public ideas" on public.ideas;
 drop policy if exists "public image reads" on storage.objects;
 drop policy if exists "public image uploads" on storage.objects;
 drop policy if exists "public image deletes" on storage.objects;
@@ -85,6 +96,7 @@ create policy "public clients" on public.clients for all to authenticated using 
 create policy "public posts" on public.posts for all to authenticated using (true) with check (true);
 create policy "public post images" on public.post_images for all to authenticated using (true) with check (true);
 create policy "public post templates" on public.post_templates for all to authenticated using (true) with check (true);
+create policy "public ideas" on public.ideas for all to authenticated using (true) with check (true);
 create policy "public image reads" on storage.objects for select to authenticated using (bucket_id = 'post-images');
 create policy "public image uploads" on storage.objects for insert to authenticated with check (bucket_id = 'post-images');
 create policy "public image deletes" on storage.objects for delete to authenticated using (bucket_id = 'post-images');
